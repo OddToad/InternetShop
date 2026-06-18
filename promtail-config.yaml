@@ -1,0 +1,48 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+    
+    pipeline_stages:
+      # 1. Сначала парсим оболочку Docker лога (вытаскиваем поле 'log' и 'stream')
+      - json:
+          expressions:
+            output: log
+            stream: stream
+
+      # 3. Теперь парсим сам JSON, который сгенерировал наш Serilog
+      - json:
+          source: log
+          expressions:
+            timestamp: '"@t"'
+            exception: '"@x"'
+            message: '"@m"'
+            level: '"@l"'
+            correlationId: 'CorrelationId'
+            application: 'Application'
+            userId: 'UserId'
+            userEmail: 'UserEmail'
+
+      # 4. Превращаем эти переменные в официальные метки (Labels) внутри Loki.
+      # По ним можно будет мгновенно кликать и фильтровать в интерфейсе Grafana.
+      - labels:
+          level:
+          correlationId:
+          application:
+          userId:
+          userEmail:

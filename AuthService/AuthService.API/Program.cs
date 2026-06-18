@@ -2,8 +2,23 @@
 using AuthService.API.Endpoints; 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using AuthService.API.Middleware;
+using Serilog;
+using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Настройка SERILOG
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration) // Позволяет настраивать уровни через appsettings.json
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "AuthService") // Метка микросервиса
+    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
+    // В режиме Development выводим структурированный JSON в консоль докера
+    .WriteTo.Console(new RenderedCompactJsonFormatter())
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Настройка Базы Данных (PostgreSQL)
 var connectionString = builder.Configuration.GetConnectionString("PostgresConnection");
@@ -28,6 +43,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Включаем Serilog логгер для HTTP-запросов (логирует маршруты, статус-коды, время выполнения)
+app.UseSerilogRequestLogging();
+
+// Подключаем CORRELATION ID MIDDLEWARE
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

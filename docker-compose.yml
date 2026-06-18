@@ -1,6 +1,46 @@
 version: '3.8'
 
 services:
+  # --- СТЕК PLG ---
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: internetshop-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    networks:
+      - internetshop-network
+  
+  promtail:
+    image: grafana/promtail:3.0.0
+    container_name: internetshop-promtail
+    volumes:
+      - ./promtail-config.yaml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock # Чтение метаданных докера
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro # Чтение самих файлов логов
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - internetshop-network
+      
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: internetshop-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # Пароль для входа в панель управления Grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - loki
+    networks:
+      - internetshop-network
+   # --- КОНЕЦ СТЕК PLG ---
+
   auth-db:
     image: postgres:16-alpine
     container_name: internetshop-auth-db
@@ -38,8 +78,12 @@ services:
     networks:
       - internetshop-network
 
+
+
 volumes:
   postgres_internetservice_data:
+  loki_data:
+  grafana_data:
 
 networks:
   internetshop-network:
