@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  auth-db:
+    image: postgres:16-alpine
+    container_name: internetshop-auth-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin1243
+      POSTGRES_DB: InernetShop_AuthDb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_internetservice_data:/var/lib/postgresql/data
+    networks:
+      - internetshop-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d InernetShop_AuthDb"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  auth-service:
+    image: internetshop-auth-service:latest
+    container_name: internetshop-auth-api
+    build:
+      context: .
+      dockerfile: AuthService/AuthService.API/Dockerfile
+    ports:
+      - "7070:8080" # Внешний порт : Внутренний порт контейнера
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__PostgresConnection=Host=auth-db;Port=5432;Database=InernetShop_AuthDb;Username=postgres;Password=admin1243
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    networks:
+      - internetshop-network
+
+volumes:
+  postgres_internetservice_data:
+
+networks:
+  internetshop-network:
+    driver: bridge
