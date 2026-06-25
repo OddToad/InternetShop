@@ -31,7 +31,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0
     container_name: internetshop-keycloak
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
@@ -42,6 +42,8 @@ services:
       - KC_DB_PASSWORD=admin1243
     ports:
       - "8080:8080"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -120,15 +122,14 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       # Подключение к базе данных, созданной скриптом инициализации
       - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=internetshop_test_db;Username=postgres;Password=admin1243
-      - Authentication__MetadataAddress=http://internetshop-keycloak:8080/realms/master/.well-known/openid-configuration
-      - Authentication__Authority=http://internetshop-keycloak:8080/realms/master
+      - Authentication__MetadataAddress=http://internetshop-keycloak:8080/realms/InternetShop/.well-known/openid-configuration
+      - Authentication__Authority=http://internetshop-keycloak:8080/realms/InternetShop
       - Authentication__Audience=account
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - internetshop-network
-
 volumes:
   postgres_main_data:
   loki_data:

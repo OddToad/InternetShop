@@ -8,6 +8,7 @@ using TestService.Application;
 using TestService.Infrastructure;
 using TestService.API.Endpoints;
 using Microsoft.OpenApi.Models;
+using TestService.Infrastructure.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -46,10 +47,12 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 
 
+builder.Services.AddHttpClient();
+
 // ==============================================================================
 // НАСТРОЙКА OPENAPI / SWAGGER С ПОДДЕРЖКОЙ KEYCLOAK (JWT)
 // ==============================================================================
-builder.Services.AddOpenApi(options =>
+builder.Services.AddOpenApi("v1", options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
     {
@@ -61,7 +64,7 @@ builder.Services.AddOpenApi(options =>
         document.Servers.Clear();
         document.Servers.Add(new OpenApiServer { Url = "/api/test" });
 
-        // Настройка безопасности (остается без изменений)
+        // Настройка безопасности (оставляем без изменений)
         var securityScheme = new OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -90,21 +93,24 @@ builder.Services.AddOpenApi(options =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.MetadataAddress = builder.Configuration["Authentication:MetadataAddress"]!;
-        options.Authority = builder.Configuration["Authentication:Authority"];
-        options.Audience = builder.Configuration["Authentication:Audience"];
-        options.RequireHttpsMetadata = false; // Отключаем HTTPS-валидацию для локальной Docker-сети
+        var authority = builder.Configuration["Authentication:Authority"];
+        options.Authority = authority;
+        options.MetadataAddress = $"{authority.TrimEnd('/')}/.well-known/openid-configuration";
+        options.Audience = builder.Configuration["Authentication:Audience"] ?? "account";
+        options.RequireHttpsMetadata = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuers = new[]
             {
-                "http://localhost:5000/auth/realms/master",
-                "http://keycloak:8080/realms/master" // на случай внутренних тестов
+                authority,  // http://localhost:8080/realms/InternetShop
+                "http://keycloak:8080/realms/InternetShop",  // Для внутренних Docker-запросов
+                "http://localhost:5000/auth/realms/InternetShop"  // Если есть прокси
             },
-            ValidateAudience = false, // Для базовой интеграции с Keycloak отключаем валидацию Audience
+            ValidateAudience = false,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(5) // Сглаживание разницы во времени между контейнерами
+            ClockSkew = TimeSpan.FromSeconds(5)
         };
     });
 
@@ -121,6 +127,13 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+//ЗАПУСК ДИАГНОСТИКИ
+using (var scope = app.Services.CreateScope())
+{
+    var diagnosticService = scope.ServiceProvider.GetRequiredService<IConfigurationDiagnosticService>();
+    diagnosticService.LogConfiguration();
+}
 
 // ==============================================================================
 // 5. АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ И МИГРАЦИЯ БАЗЫ ДАННЫХ
@@ -148,17 +161,18 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 1. Генерируем json-спецификацию (внутри контейнера она живет по адресу /openapi/v1.json)
-Microsoft.AspNetCore.Builder.OpenApiEndpointRouteBuilderExtensions.MapOpenApi(app);
+// 1. Генерируем json-спецификацию (явно привязываем роут к документу v1)
+app.MapOpenApi("/openapi/{documentName}.json");
 
 // 2. Настройка интерфейса Swagger UI
-Microsoft.AspNetCore.Builder.SwaggerUIBuilderExtensions.UseSwaggerUI(app, options =>
+app.UseSwaggerUI(options =>
 {
     // Говорим Swagger UI запрашивать схему по абсолютному пути через шлюз
     options.SwaggerEndpoint("/api/test/openapi/v1.json", "TestService API v1");
     options.RoutePrefix = "swagger";
 });
 
+app.MapAuthEndpoints();
 app.MapProductEndpoints();
 
 // ==============================================================================

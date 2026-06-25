@@ -1,61 +1,74 @@
-using Serilog;
+п»їusing Serilog;
+using Serilog.Events;
 using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Настройка Serilog в зависимости от среды окружения
-var loggerConfig = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext();
+// РџСЂРѕРІРµСЂРєР° Docker
+var inDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
-if (builder.Environment.IsDevelopment())
+// РќР°СЃС‚СЂРѕР№РєР° Р»РѕРіРёСЂРѕРІР°РЅРёСЏ
+var loggerConfig = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+    .MinimumLevel.Override("Yarp", LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", "YARP-Gateway")
+    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName);
+
+if (inDocker)
 {
-    //вывод для локальной разработки в Visual Studio
-    loggerConfig.WriteTo.Console(outputTemplate:
-        "[{Timestamp:HH:mm:ss} {Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}");
+    // Р’ Docker - JSON РґР»СЏ Loki
+    loggerConfig.WriteTo.Console(new CompactJsonFormatter());
 }
 else
 {
-    // Структурированный JSON для Promtail -> Loki при работе в Docker
-    loggerConfig.WriteTo.Console(new CompactJsonFormatter());
+    // Р›РѕРєР°Р»СЊРЅРѕ - С‡РёС‚Р°РµРјС‹Р№ С‚РµРєСЃС‚
+    loggerConfig.WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+    );
 }
 
 Log.Logger = loggerConfig.CreateLogger();
 builder.Host.UseSerilog();
 
-// Добавляем поддержку YARP Reverse Proxy
+// Р”РѕР±Р°РІР»СЏРµРј YARP
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
 var app = builder.Build();
 
-// Маршрутизация запросов
-app.UseRouting();
-
-// MIDDLEWARE ДЛЯ ВОЗВРАТА CORRELATION ID КЛИЕНТУ
+// Middleware РґР»СЏ С‡РёСЃС‚РѕРіРѕ Р»РѕРіРёСЂРѕРІР°РЅРёСЏ
 app.Use(async (context, next) =>
 {
-    // .NET 9 автоматически создает Activity для каждого входящего запроса
     var traceId = System.Diagnostics.Activity.Current?.TraceId.ToString()
                   ?? context.TraceIdentifier;
 
-    // Добавляем TraceId в заголовки ответа, чтобы клиент его видел (например, "X-Correlation-Id")
-    context.Response.Headers.Append("X-Correlation-Id", traceId);
+    Log.Information("в†’ {Method} {Path}",
+        context.Request.Method,
+        context.Request.Path);
 
     await next();
+
+    Log.Information("в†ђ {StatusCode} {Method} {Path}",
+        context.Response.StatusCode,
+        context.Request.Method,
+        context.Request.Path);
 });
 
-// Подключаем YARP
+app.UseRouting();
 app.MapReverseProxy();
 
 try
 {
-    Log.Information("Старт YARP API Gateway...");
+    Log.Information("YARP Gateway started in {Environment}",
+        builder.Environment.EnvironmentName);
     app.Run();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "YARP API Gateway аварийно завершил работу");
+    Log.Fatal(ex, "YARP Gateway crashed");
 }
 finally
 {

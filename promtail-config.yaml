@@ -9,40 +9,57 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: docker-containers
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-    relabel_configs:
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)'
-        target_label: 'container'
-    
+  - job_name: docker
+
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+
     pipeline_stages:
-      # 1. Сначала парсим оболочку Docker лога (вытаскиваем поле 'log' и 'stream')
+
+      # Разбираем Docker json-file
       - json:
           expressions:
-            output: log
+            log: log
             stream: stream
+            timestamp: time
 
-      # 3. Теперь парсим сам JSON, который сгенерировал наш Serilog
+      # Разбираем JSON, который пишет Serilog
       - json:
           source: log
           expressions:
-            timestamp: '"@t"'
-            exception: '"@x"'
-            message: '"@m"'
+            ts: '"@t"'
             level: '"@l"'
-            correlationId: 'CorrelationId'
-            application: 'Application'
-            userId: 'UserId'
-            userEmail: 'UserEmail'
+            message: '"@mt"'
+            rendered_message: '"@m"'
+            exception: '"@x"'
+            application: Application
+            environment: Environment
+            source_context: SourceContext
+            status_code: StatusCode
+            method: Method
+            request_path: RequestPath
 
-      # 4. Превращаем эти переменные в официальные метки (Labels) внутри Loki.
-      # По ним можно будет мгновенно кликать и фильтровать в интерфейсе Grafana.
+      # Если уровень отсутствует (Information), подставляем Information
+      - template:
+          source: level
+          template: '{{ if .Value }}{{ .Value }}{{ else }}Information{{ end }}'
+
+      # Лейблы Loki
       - labels:
           level:
-          correlationId:
           application:
-          userId:
-          userEmail:
+          environment:
+          source_context:
+          status_code:
+
+      # Красивый текст лога
+      - template:
+          source: output
+          template: '{{ if .message }}{{ .message }}{{ else }}{{ .log }}{{ end }}{{ if .exception }} | {{ .exception }}{{ end }}'
+
+      - output:
+          source: output
