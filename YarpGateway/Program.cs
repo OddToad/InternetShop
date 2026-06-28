@@ -20,7 +20,7 @@ var loggerConfig = new LoggerConfiguration()
 if (inDocker)
 {
     // В Docker - JSON для Loki
-    loggerConfig.WriteTo.Console(new CompactJsonFormatter());
+    loggerConfig.WriteTo.Console(new RenderedCompactJsonFormatter());
 }
 else
 {

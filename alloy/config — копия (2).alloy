@@ -1,0 +1,39 @@
+// 1. Находим контейнеры через сокет Docker
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// 2. Читаем логи через Docker API
+loki.source.docker "docker_logs" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.docker.containers.targets
+  
+  // Отправляем в простейший процесс, который добавит только базовые лейблы
+  forward_to = [loki.process.simple_pass.receiver]
+}
+
+// 3. Добавляем базовые лейблы, чтобы логи можно было фильтровать
+loki.process "simple_pass" {
+  forward_to = [loki.write.loki_storage.receiver]
+
+  // Создаем лейблы для Grafana, чтобы не искать иголку в стоге сена
+  stage.static_labels {
+    values = { job = "docker_raw_logs" }
+  }
+
+  stage.labels {
+    values = { 
+      container = "container_name",
+    }
+  }
+  
+  // Мы НЕ добавляем блоки stage.json, stage.template или stage.output.
+  // Без них Alloy отправляет строку в исходном (сыром) виде.
+}
+
+// 4. Отправка в Loki
+loki.write "loki_storage" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
