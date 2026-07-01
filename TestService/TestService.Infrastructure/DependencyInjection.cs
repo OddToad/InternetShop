@@ -22,7 +22,7 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString));
 
         // 2. Регистрируем сам репозиторий
-        /services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IProductRepository, ProductRepository>();
 
         // РЕГИСТРАЦИЯ ДИАГНОСТИКИ
         services.AddSingleton<IConfigurationDiagnosticService, ConfigurationDiagnosticService>();
