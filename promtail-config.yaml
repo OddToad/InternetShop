@@ -1,0 +1,65 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+
+    pipeline_stages:
+
+      # Разбираем Docker json-file
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            timestamp: time
+
+      # Разбираем JSON, который пишет Serilog
+      - json:
+          source: log
+          expressions:
+            ts: '"@t"'
+            level: '"@l"'
+            message: '"@mt"'
+            rendered_message: '"@m"'
+            exception: '"@x"'
+            application: Application
+            environment: Environment
+            source_context: SourceContext
+            status_code: StatusCode
+            method: Method
+            request_path: RequestPath
+
+      # Если уровень отсутствует (Information), подставляем Information
+      - template:
+          source: level
+          template: '{{ if .Value }}{{ .Value }}{{ else }}Information{{ end }}'
+
+      # Лейблы Loki
+      - labels:
+          level:
+          application:
+          environment:
+          source_context:
+          status_code:
+
+      # Красивый текст лога
+      - template:
+          source: output
+          template: '{{ if .message }}{{ .message }}{{ else }}{{ .log }}{{ end }}{{ if .exception }} | {{ .exception }}{{ end }}'
+
+      - output:
+          source: output

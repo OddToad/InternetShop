@@ -1,0 +1,41 @@
+{
+  "realm": "InternetShop",
+  "enabled": true,
+  "displayName": "Internet Shop",
+  "roles": {
+    "realm": [
+      { "name": "admin", "description": "Администратор магазина" },
+      { "name": "user", "description": "Покупатель" }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Админ",
+      "lastName": "-",
+      "email": "admin@local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "web-gateway",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "secret": "L9X1BdkMOzWmDXdgVOig1EQdRGkZpnT4",
+      "fullScopeAllowed": true
+    }
+  ]
+}

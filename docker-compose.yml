@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  # ==============================================================================
+  # 1. ЦЕНТРАЛЬНАЯ БАЗА ДАННЫХ POSTGRESQL (Для Keycloak и Микросервисов)
+  # ==============================================================================
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: internetshop-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin1243
+      POSTGRES_DB: postgres # Системная дефолтная БД
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_main_data:/var/lib/postgresql/data
+      # Наш скрипт, который автоматически создаст 'keycloak_db' и 'internetshop_test_db'
+      - ./postgres-init:/docker-entrypoint-initdb.d
+    networks:
+      - internetshop-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  # ==============================================================================
+  # 2. ИНФРАСТРУКТУРА AUTH (Keycloak)
+  # ==============================================================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: internetshop-keycloak
+    command: start-dev --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_DB=postgres
+      # Подключаемся к общему серверу БД, но в базу keycloak_db
+      - KC_DB_URL=jdbc:postgresql://postgres-db:5432/keycloak_db
+      - KC_DB_USERNAME=postgres
+      - KC_DB_PASSWORD=admin1243
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - internetshop-network
+
+  # ==============================================================================
+  # 3. СТЕК МОНИТОРИНГА И ЛОГИРОВАНИЯ (PLG Stack)
+  # ==============================================================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: internetshop-loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    networks:
+      - internetshop-network
+  
+  alloy:
+    image: grafana/alloy:latest
+    container_name: internetshop-alloy
+    ports:
+      - "12345:12345"
+    user: "0:0"
+    command:
+        - run
+        - /etc/alloy/config.alloy
+        - --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+        - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+        - /var/run/docker.sock:/var/run/docker.sock
+        - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+        - loki
+    networks:
+        - internetshop-network
+      
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: internetshop-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin 
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - loki
+    networks:
+      - internetshop-network
+
+  # ==============================================================================
+  # 4. API GATEWAY (YARP)
+  # ==============================================================================
+  api-gateway:
+    image: internetshop-api-gateway:latest
+    container_name: internetshop-api-gateway
+    build:
+      context: ./YarpGateway 
+      dockerfile: Dockerfile
+    ports:
+      - "5000:8080"
+    #environment:
+    #  - ASPNETCORE_ENVIRONMENT=Development
+    depends_on:
+      - keycloak
+    networks:
+      - internetshop-network
+
+  # ==============================================================================
+  # 5. ТЕСТОВЫЙ МИКРОСЕРВИС
+  # ==============================================================================
+  test-service:
+    image: internetshop-test-service:latest
+    container_name: internetshop-test-api
+    build:
+      context: ./TestService # Контекст указывает на корень солюшена сервиса
+      dockerfile: TestService.API/Dockerfile 
+    environment:
+    #  - ASPNETCORE_ENVIRONMENT=Development
+      # Подключение к базе данных, созданной скриптом инициализации
+      - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=internetshop_test_db;Username=postgres;Password=admin1243
+      - Authentication__MetadataAddress=http://internetshop-keycloak:8080/realms/InternetShop/.well-known/openid-configuration
+      - Authentication__Authority=http://internetshop-keycloak:8080/realms/InternetShop
+      - Authentication__Audience=account
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - internetshop-network
+volumes:
+  postgres_main_data:
+  loki_data:
+  grafana_data:
+
+networks:
+  internetshop-network:
+    driver: bridge

@@ -1,0 +1,58 @@
+// 1. Находим контейнеры через сокет Docker
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// 2. Читаем логи через Docker API
+loki.source.docker "docker_logs" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.docker.containers.targets
+  
+  forward_to = [loki.process.simple_pass.receiver]
+}
+
+// 3. Парсим чистый JSON прямо из сокета и делаем лейблы
+loki.process "simple_pass" {
+  forward_to = [loki.write.loki_storage.receiver]
+
+  // Статический лейбл (всегда железно запишется в Loki)
+  stage.static_labels {
+    values = { job = "docker_raw_logs" }
+  }
+
+  // Имя контейнера из метаданных докера
+  stage.labels {
+    values = { 
+      container = "container_name",
+    }
+  }
+
+  // ШАГ 1: Так как в начале строки НЕТ мусора, парсим JSON напрямую со старта строки
+  stage.json {
+    expressions = {
+      app     = "Application",
+      env     = "Environment",
+      status  = "StatusCode",
+      method  = "Method",
+    }
+  }
+
+  // ШАГ 2: Переносим вытащенные поля в лейблы Loki
+  stage.labels {
+    values = {
+      application = "app",
+      environment = "env",
+      status_code = "status",
+      http_method = "method",
+    }
+  }
+  
+  // Строка уходит в Loki в исходном виде чистого JSON, но со всеми лейблами!
+}
+
+// 4. Отправка в Loki
+loki.write "loki_storage" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
