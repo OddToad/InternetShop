@@ -109,8 +109,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5000:8080"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+    #environment:
+    #  - ASPNETCORE_ENVIRONMENT=Development
     depends_on:
       - keycloak
     networks:
@@ -126,7 +126,7 @@ services:
       context: ./TestService # Контекст указывает на корень солюшена сервиса
       dockerfile: TestService.API/Dockerfile 
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+    #  - ASPNETCORE_ENVIRONMENT=Development
       # Подключение к базе данных, созданной скриптом инициализации
       - ConnectionStrings__DefaultConnection=Host=postgres-db;Port=5432;Database=internetshop_test_db;Username=postgres;Password=admin1243
       - Authentication__MetadataAddress=http://internetshop-keycloak:8080/realms/InternetShop/.well-known/openid-configuration

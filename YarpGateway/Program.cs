@@ -4,33 +4,54 @@ using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Проверка Docker
-var inDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
+//// Проверка Docker
+//var inDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
-// Настройка логирования
-var loggerConfig = new LoggerConfiguration()
-    .MinimumLevel.Information()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-    .MinimumLevel.Override("Yarp", LogEventLevel.Warning)
+//// Настройка логирования
+//var loggerConfig = new LoggerConfiguration()
+//    .MinimumLevel.Information()
+//    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+//    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+//    .MinimumLevel.Override("Yarp", LogEventLevel.Warning)
+//    .Enrich.FromLogContext()
+//    .Enrich.WithProperty("Application", "YARP-Gateway")
+//    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName);
+
+//if (inDocker)
+//{
+//    // В Docker - JSON для Loki
+//    loggerConfig.WriteTo.Console(new RenderedCompactJsonFormatter());
+//}
+//else
+//{
+//    // Локально - читаемый текст
+//    loggerConfig.WriteTo.Console(
+//        outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}"
+//    );
+//}
+
+//Log.Logger = loggerConfig.CreateLogger();
+var loggerConfiguration = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .Enrich.WithProperty("Application", "YARP-Gateway")
+    .Enrich.WithProperty("Application", builder.Environment.ApplicationName)
     .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName);
 
-if (inDocker)
+var consoleFormat = builder.Configuration["LoggingSettings:ConsoleFormat"];
+
+if (string.Equals(consoleFormat, "Json", StringComparison.OrdinalIgnoreCase))
 {
-    // В Docker - JSON для Loki
-    loggerConfig.WriteTo.Console(new RenderedCompactJsonFormatter());
+    loggerConfiguration.WriteTo.Console(new RenderedCompactJsonFormatter());
 }
 else
 {
-    // Локально - читаемый текст
-    loggerConfig.WriteTo.Console(
-        outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}"
-    );
+    loggerConfiguration.WriteTo.Console(
+        outputTemplate:
+        "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}");
 }
 
-Log.Logger = loggerConfig.CreateLogger();
+Log.Logger = loggerConfiguration.CreateLogger();
+
 builder.Host.UseSerilog();
 
 // Добавляем YARP

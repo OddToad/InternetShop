@@ -12,26 +12,51 @@ using TestService.Infrastructure.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
+//var loggerConfig = new LoggerConfiguration()
+//    .ReadFrom.Configuration(builder.Configuration)
+//    .Enrich.FromLogContext(); // Обязательно для автоматического подхвата TraceId (Correlation ID)
+
+//if (builder.Environment.IsDevelopment())
+//{
+//    // Понятный, цветной вывод для разработки локально в Visual Studio
+//    loggerConfig.WriteTo.Console(outputTemplate:
+//        "[{Timestamp:HH:mm:ss} {Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}");
+//}
+//else
+//{
+//    // Компактный JSON формат для контейнеров (Promtail -> Loki парсят его автоматически)
+//    loggerConfig.WriteTo.Console(new CompactJsonFormatter());
+//}
+
+//Log.Logger = loggerConfig.CreateLogger();
+
 // ==============================================================================
 // 1. НАСТРОЙКА СТРУКТУРИРОВАННОГО ЛОГИРОВАНИЯ (Serilog)
 // ==============================================================================
-var loggerConfig = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .Enrich.FromLogContext(); // Обязательно для автоматического подхвата TraceId (Correlation ID)
 
-if (builder.Environment.IsDevelopment())
+
+var loggerConfiguration = new LoggerConfiguration()
+
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("Application", builder.Environment.ApplicationName)
+    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName);
+
+var consoleFormat = builder.Configuration["LoggingSettings:ConsoleFormat"];
+
+if (string.Equals(consoleFormat, "Json", StringComparison.OrdinalIgnoreCase))
 {
-    // Понятный, цветной вывод для разработки локально в Visual Studio
-    loggerConfig.WriteTo.Console(outputTemplate:
-        "[{Timestamp:HH:mm:ss} {Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}");
+    loggerConfiguration.WriteTo.Console(new RenderedCompactJsonFormatter());
 }
 else
 {
-    // Компактный JSON формат для контейнеров (Promtail -> Loki парсят его автоматически)
-    loggerConfig.WriteTo.Console(new CompactJsonFormatter());
+    loggerConfiguration.WriteTo.Console(
+        outputTemplate:
+        "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}");
 }
 
-Log.Logger = loggerConfig.CreateLogger();
+Log.Logger = loggerConfiguration.CreateLogger();
+
 builder.Host.UseSerilog();
 
 
