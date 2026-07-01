@@ -8,7 +8,7 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        // Регистрируем наш бизнес-сервис
+        // Регистрируем бизнес-сервис
         services.AddScoped<IProductService, ProductService>();
 
         return services;

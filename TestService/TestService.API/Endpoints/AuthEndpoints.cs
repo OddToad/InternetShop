@@ -24,13 +24,13 @@ public static class AuthEndpoints
             IConfiguration configuration,
             IHttpClientFactory httpClientFactory) =>
         {
-            // 1. Валидация
+            // Валидация
             if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
             {
                 return Results.BadRequest(new { error = "Логин и пароль обязательны." });
             }
 
-            // 2. Настройки Keycloak
+            // Настройки Keycloak
             var authority = configuration["Authentication:Authority"];
             if (string.IsNullOrEmpty(authority))
             {
@@ -39,18 +39,18 @@ public static class AuthEndpoints
 
             var tokenEndpoint = $"{authority.TrimEnd('/')}/protocol/openid-connect/token";
 
-            // 3. Параметры запроса (как в PowerShell)
+            // Параметры запроса
             var tokenRequestParams = new List<KeyValuePair<string, string>>
             {
                 new("grant_type", "password"),
                 new("username", request.Username),
                 new("password", request.Password),
-                new("scope", "openid profile email")  // ← ДОБАВЛЯЕМ SCOPE!
+                new("scope", "openid profile email")
             };
 
             var client = httpClientFactory.CreateClient();
 
-            // 4. Basic Authentication
+            // Basic Authentication
             var clientId = configuration["Authentication:ClientId"] ?? "shop-client";
             var clientSecret = configuration["Authentication:ClientSecret"] ?? "L9X1BdkMOzWmDXdgVOig1EQdRGkZpnT4";
 
@@ -60,7 +60,7 @@ public static class AuthEndpoints
 
             try
             {
-                // 5. Отправка запроса
+                // Отправка запроса
                 var response = await client.PostAsync(
                     tokenEndpoint,
                     new FormUrlEncodedContent(tokenRequestParams));
@@ -80,7 +80,7 @@ public static class AuthEndpoints
                     }, statusCode: (int)response.StatusCode);
                 }
 
-                // 6. Успешный ответ
+                // Успешный ответ
                 var tokenData = await response.Content.ReadFromJsonAsync<KeycloakTokenResponse>();
                 return Results.Ok(tokenData);
             }
@@ -113,7 +113,7 @@ public class KeycloakTokenResponse
     public int ExpiresIn { get; set; }
 
     [JsonPropertyName("refresh_expires_in")]
-    public int RefreshExpiresIn { get; set; }  // ← ДОБАВЛЯЕМ
+    public int RefreshExpiresIn { get; set; }
 
     [JsonPropertyName("refresh_token")]
     public string RefreshToken { get; set; } = string.Empty;
@@ -122,13 +122,13 @@ public class KeycloakTokenResponse
     public string TokenType { get; set; } = string.Empty;
 
     [JsonPropertyName("id_token")]
-    public string IdToken { get; set; } = string.Empty;  // ← ДОБАВЛЯЕМ
+    public string IdToken { get; set; } = string.Empty;
 
     [JsonPropertyName("not-before-policy")]
-    public int NotBeforePolicy { get; set; }  // ← ДОБАВЛЯЕМ
+    public int NotBeforePolicy { get; set; }
 
     [JsonPropertyName("session_state")]
-    public string SessionState { get; set; } = string.Empty;  // ← ДОБАВЛЯЕМ
+    public string SessionState { get; set; } = string.Empty;
 
     [JsonPropertyName("scope")]
     public string Scope { get; set; } = string.Empty;

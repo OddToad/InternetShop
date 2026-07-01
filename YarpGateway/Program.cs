@@ -3,34 +3,7 @@ using Serilog.Events;
 using Serilog.Formatting.Compact;
 
 var builder = WebApplication.CreateBuilder(args);
-
-//// Проверка Docker
-//var inDocker = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
-
-//// Настройка логирования
-//var loggerConfig = new LoggerConfiguration()
-//    .MinimumLevel.Information()
-//    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-//    .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-//    .MinimumLevel.Override("Yarp", LogEventLevel.Warning)
-//    .Enrich.FromLogContext()
-//    .Enrich.WithProperty("Application", "YARP-Gateway")
-//    .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName);
-
-//if (inDocker)
-//{
-//    // В Docker - JSON для Loki
-//    loggerConfig.WriteTo.Console(new RenderedCompactJsonFormatter());
-//}
-//else
-//{
-//    // Локально - читаемый текст
-//    loggerConfig.WriteTo.Console(
-//        outputTemplate: "[{Timestamp:HH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}"
-//    );
-//}
-
-//Log.Logger = loggerConfig.CreateLogger();
+// НАСТРОЙКА ЛОГИРОВАНИЯ SERILOG
 var loggerConfiguration = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()

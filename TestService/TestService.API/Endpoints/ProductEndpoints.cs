@@ -12,14 +12,14 @@ public static class ProductEndpoints
     {
         var group = app.MapGroup("/");
 
-        // 1. Получение (вызываем сервис)
+        // Получение (вызываем сервис)
         group.MapGet("products", async (IProductService productService) =>
         {
             var products = await productService.GetAllProductsAsync();
             return Results.Ok(products);
         });
 
-        // 2. Создание (вызываем сервис)
+        // Создание (вызываем сервис)
         group.MapPost("products", async (
             [FromBody] CreateProductCommand command,
             ClaimsPrincipal userPrincipal,

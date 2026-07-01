@@ -12,29 +12,7 @@ using TestService.Infrastructure.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//var loggerConfig = new LoggerConfiguration()
-//    .ReadFrom.Configuration(builder.Configuration)
-//    .Enrich.FromLogContext(); // Обязательно для автоматического подхвата TraceId (Correlation ID)
-
-//if (builder.Environment.IsDevelopment())
-//{
-//    // Понятный, цветной вывод для разработки локально в Visual Studio
-//    loggerConfig.WriteTo.Console(outputTemplate:
-//        "[{Timestamp:HH:mm:ss} {Level:u3}] [{TraceId}] {Message:lj}{NewLine}{Exception}");
-//}
-//else
-//{
-//    // Компактный JSON формат для контейнеров (Promtail -> Loki парсят его автоматически)
-//    loggerConfig.WriteTo.Console(new CompactJsonFormatter());
-//}
-
-//Log.Logger = loggerConfig.CreateLogger();
-
-// ==============================================================================
-// 1. НАСТРОЙКА СТРУКТУРИРОВАННОГО ЛОГИРОВАНИЯ (Serilog)
-// ==============================================================================
-
-
+// НАСТРОЙКА ЛОГИРОВАНИЯ SERILOG
 var loggerConfiguration = new LoggerConfiguration()
 
     .ReadFrom.Configuration(builder.Configuration)
@@ -60,10 +38,9 @@ Log.Logger = loggerConfiguration.CreateLogger();
 builder.Host.UseSerilog();
 
 
-// ==============================================================================
-// 3. ВНЕДРЕНИЕ ЗАВИСИМОСТЕЙ СЛОЕВ (Dependency Injection)
-// ==============================================================================
-// Подключаем слой бизнес-логики (наш метод расширения из TestService.Application)
+// ВНЕДРЕНИЕ ЗАВИСИМОСТЕЙ СЛОЕВ (Dependency Injection)
+
+// Подключаем слой бизнес-логики
 builder.Services.AddApplication();
 
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -74,9 +51,7 @@ builder.Services.AddEndpointsApiExplorer();
 
 builder.Services.AddHttpClient();
 
-// ==============================================================================
 // НАСТРОЙКА OPENAPI / SWAGGER С ПОДДЕРЖКОЙ KEYCLOAK (JWT)
-// ==============================================================================
 builder.Services.AddOpenApi("v1", options =>
 {
     options.AddDocumentTransformer((document, context, cancellationToken) =>
@@ -85,11 +60,11 @@ builder.Services.AddOpenApi("v1", options =>
         document.Info.Version = "v1";
         document.Components ??= new Microsoft.OpenApi.Models.OpenApiComponents();
 
-        // Жестко говорим Swagger, что все запросы к эндпоинтам должны идти через шлюз и префикс /api/test
+        //все запросы к эндпоинтам должны идти через шлюз и префикс /api/test
         document.Servers.Clear();
         document.Servers.Add(new OpenApiServer { Url = "/api/test" });
 
-        // Настройка безопасности (оставляем без изменений)
+        // Настройка безопасности
         var securityScheme = new OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -112,9 +87,7 @@ builder.Services.AddOpenApi("v1", options =>
 });
 
 
-// ==============================================================================
-// 4. НАСТРОЙКА JWT АУТЕНТИФИКАЦИИ ОТ KEYCLOAK
-// ==============================================================================
+// НАСТРОЙКА JWT АУТЕНТИФИКАЦИИ ОТ KEYCLOAK
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -160,9 +133,7 @@ using (var scope = app.Services.CreateScope())
     diagnosticService.LogConfiguration();
 }
 
-// ==============================================================================
-// 5. АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ И МИГРАЦИЯ БАЗЫ ДАННЫХ
-// ==============================================================================
+// АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ И МИГРАЦИЯ БАЗЫ ДАННЫХ
 using (var scope = app.Services.CreateScope())
 {
     try
@@ -180,9 +151,8 @@ using (var scope = app.Services.CreateScope())
 
 
 app.UseCors();
-// ==============================================================================
-// 6. MIDDLEWARE И МАРШРУТИЗАЦИЯ (Minimal APIs)
-// ==============================================================================
+
+// MIDDLEWARE И МАРШРУТИЗАЦИЯ (Minimal APIs)
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -200,9 +170,7 @@ app.UseSwaggerUI(options =>
 app.MapAuthEndpoints();
 app.MapProductEndpoints();
 
-// ==============================================================================
-// 7. ЗАПУСК ПРИЛОЖЕНИЯ
-// ==============================================================================
+// ЗАПУСК ПРИЛОЖЕНИЯ
 try
 {
     Log.Information("Старт микросервиса TestService.API на платформе .NET 9...");

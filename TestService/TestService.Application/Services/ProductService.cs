@@ -18,7 +18,6 @@ public class ProductService : IProductService
 
     public async Task<IEnumerable<ProductDto>> GetAllProductsAsync()
     {
-        // Использование структурированного логирования (свойства в строке)
         _logger.LogInformation("Запрос на получение списка всех продуктов из базы данных.");
 
         var products = await _repository.GetAllAsync();
@@ -32,8 +31,6 @@ public class ProductService : IProductService
 
     public async Task<ProductDto> CreateProductAsync(CreateProductCommand command)
     {
-        // ВАЖНО: передаем command.Name как параметр, а не через интерполяцию строк $"..."
-        // Это позволит Serilog вынести "ProductName" в отдельное индексируемое поле JSON для Loki
         _logger.LogInformation("Начало процесса создания нового продукта. Имя: {ProductName}, Цена: {ProductPrice}",
             command.Name, command.Price);
 
