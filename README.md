@@ -6,77 +6,71 @@ InternetShop — учебный проект микросервисной арх
 README.md
 
 ### Архитектура
-
+```mermaid
 flowchart TB
 
-%% =========================  
-%% CLIENT LAYER  
-%% =========================  
-subgraph Client\_Layer\[Client Layer\]  
-   Client\[Web / Mobile Client\]  
+%% =========================
+%% CLIENT LAYER
+%% =========================
+subgraph Client_Layer[Client Layer]
+    Client[Web / Mobile Client]
 end
 
-%% =========================  
-%% EDGE LAYER  
-%% =========================  
-subgraph Edge\_Layer\[Edge Layer\]  
-   Gateway\[YARP API Gateway\]  
+%% =========================
+%% EDGE LAYER
+%% =========================
+subgraph Edge_Layer[Edge Layer]
+    Gateway[YARP API Gateway]
 end
 
-%% =========================  
-%% AUTH LAYER  
-%% =========================  
-subgraph Auth\_Layer\[Authentication & Identity\]  
-   Keycloak\[Keycloak\]  
+%% =========================
+%% AUTH LAYER
+%% =========================
+subgraph Auth_Layer[Authentication & Identity]
+    Keycloak[Keycloak]
 end
 
-%% =========================  
-%% SERVICE LAYER  
-%% =========================  
-subgraph Service\_Layer\[Microservices Layer\]  
-   TestService\[TestService API\]  
+%% =========================
+%% SERVICE LAYER
+%% =========================
+subgraph Service_Layer[Microservices Layer]
+    TestService[TestService API]
 end
 
-%% =========================  
-%% DATA LAYER  
-%% =========================  
-subgraph Data\_Layer\[Data Layer\]  
-   Postgres\[(PostgreSQL)\]  
+%% =========================
+%% DATA LAYER
+%% =========================
+subgraph Data_Layer[Data Layer]
+    Postgres[(PostgreSQL)]
 end
 
-%% =========================  
-%% OBSERVABILITY LAYER  
-%% =========================  
-subgraph Observability\[Observability Stack\]  
-   Alloy\[Grafana Alloy\<br/>Log Collector\]  
-   Loki\[Loki\<br/>Log Storage\]  
-   Grafana\[Grafana\<br/>Visualization\]  
+%% =========================
+%% OBSERVABILITY LAYER
+%% =========================
+subgraph Observability[Observability Stack]
+    Alloy[Grafana Alloy<br/>Log Collector]
+    Loki[Loki<br/>Log Storage]
+    Grafana[Grafana<br/>Visualization]
 end
 
-%% =========================  
-%% REQUEST FLOW  
-%% =========================  
-Client --> Gateway  
-Gateway --> TestService  
+%% =========================
+%% REQUEST FLOW
+%% =========================
+Client --> Gateway
+Gateway --> TestService
 Gateway --> Keycloak
 
-TestService --> Postgres  
+TestService --> Postgres
 Keycloak --> Postgres
 
-%% =========================  
-%% LOGGING FLOW  
-%% =========================  
-TestService -. logs .-> Alloy  
+%% =========================
+%% LOGGING FLOW
+%% =========================
+TestService -. logs .-> Alloy
 Gateway -. logs .-> Alloy
 
 Alloy --> Loki --> Grafana
-
-### Требования
-
-- Docker Desktop 4.x+
-- Docker Compose v2
-- .NET SDK 9.0 (для локальной разработки)
-- Visual Studio 2022 / Rider / VS Code
+```
 
 ## Первый запуск
 
